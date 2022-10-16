@@ -1,0 +1,12 @@
+OASISFormat: 0.4
+Name:        computor_v1
+Version:     1
+Synopsis:    an implementation of the 42 computor_v1 project
+Authors:     Joachim Giron
+License:     GPL
+Executable computor_v1
+  Path:       .
+  BuildTools: ocamlbuild
+  MainIs:     computor_v1.ml
+  BuildDepends:
+    str
