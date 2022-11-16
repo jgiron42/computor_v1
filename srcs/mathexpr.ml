@@ -1,4 +1,3 @@
-
 type base_type = float;;
 
 type operation =
@@ -41,7 +40,7 @@ let print_oper = function
 | Div -> print_string "/"
 | Invert -> print_string "i"
 | Exp -> print_string "^"
-| Opp -> print_string "~";;
+| Opp -> print_string "-";;
 let rec print_lex = function
 | t :: r ->
   (match t with
@@ -240,6 +239,18 @@ let rec reduce = tree_map_d (function
   when (Float.compare (Float.rem l r) 0.) == 0
   -> Leaf(Const(Float.mul l r))
 | UnaryNode(Opp, Leaf(Const(v))) -> Leaf(Const(Float.neg v))
+| other -> other)
+;;
+
+let rec simplify = tree_map_d (function
+| BinaryNode(_, Exp, Leaf(Const(0.))) -> Leaf(Const(1.))
+| BinaryNode(r, Exp, Leaf(Const(1.))) -> r
+| BinaryNode(Leaf(Const(0.)), Exp, _) -> Leaf(Const(0.))
+| BinaryNode(Leaf(Const(1.)), Exp, _) -> Leaf(Const(1.2))
+| BinaryNode(_, Multi, Leaf(Const(0.))) -> Leaf(Const(0.))
+| BinaryNode(Leaf(Const(0.)), Multi, _) -> Leaf(Const(0.))
+| BinaryNode(r, Multi, Leaf(Const(1.))) -> r
+| BinaryNode(Leaf(Const(1.)), Multi, r) -> r
 | other -> other)
 ;;
 
