@@ -188,6 +188,23 @@ let remove_unary = tree_map_a (function
 | UnaryNode(Invert, n) -> BinaryNode(n, Exp, Leaf(Const(-1.)))
 | other -> other);;
 
+let put_unary = tree_map_a (function
+| BinaryNode(n, Multi, Leaf(Const(-1.))) -> UnaryNode(Opp, n)
+| BinaryNode(n, Exp, Leaf(Const(-1.))) -> UnaryNode(Invert, n)
+| other -> other);;
+
+let put_minus = tree_map_a (function
+| BinaryNode(a, Add, UnaryNode(Opp, b)) -> BinaryNode(a, Sub, b)
+| BinaryNode(UnaryNode(Opp, a), Add, b) -> BinaryNode(b, Sub, a)
+| Leaf(Const(1.)) -> Leaf(Const(1.)) (*for type inference TODO: remove*)
+| other -> other);;
+
+let put_div = tree_map_a (function
+| BinaryNode(a, Multi, UnaryNode(Invert, b)) -> BinaryNode(a, Div, b)
+| BinaryNode(UnaryNode(Invert, a), Multi, b) -> BinaryNode(b, Div, a)
+| UnaryNode(Invert, n) -> BinaryNode(Leaf(Const(1.)), Div, n)
+| other -> other);;
+
 let expand node = tree_map_a (function
 | BinaryNode(l, Multi, BinaryNode(r1, Add, r2)) -> (BinaryNode(BinaryNode(l, Multi, r1), Add, BinaryNode(l, Multi, r2)))
 | BinaryNode(BinaryNode(r1, Add, r2), Multi, l) -> (BinaryNode(BinaryNode(l, Multi, r1), Add, BinaryNode(l, Multi, r2)))
@@ -228,6 +245,21 @@ let  normalize = (let rec f = function
     when ((opl = opr) && (opr = op))
     -> tree_map_d f (BinaryNode(BinaryNode(l, op, rl), op, rr))
   | other -> other in tree_map_d f);;
+
+let factorize_out = tree_map_d (function
+| BinaryNode(UnaryNode(Opp, l), Multi, UnaryNode(Opp, r)) -> BinaryNode(l, Multi, r)
+| BinaryNode(UnaryNode(Opp, l), Add, UnaryNode(Opp, r)) -> UnaryNode(Opp, BinaryNode(l, Add, r))
+| BinaryNode(UnaryNode(Opp, l), Multi, r)
+| BinaryNode(l, Multi, UnaryNode(Opp, r)) -> UnaryNode(Opp, BinaryNode(l, Multi, r))
+| BinaryNode(l, Multi, (UnaryNode(Invert, _) as r)) -> BinaryNode(r, Multi, l)
+| BinaryNode(BinaryNode(UnaryNode(Invert, _) as ll, Multi, (_ as lr)), Multi, r) -> BinaryNode(ll, Multi, BinaryNode(lr, Multi, r))
+| BinaryNode(l, Multi, BinaryNode(UnaryNode(Invert, _) as rl, Multi, (_ as rr))) -> BinaryNode(rl, Multi, BinaryNode(l, Multi, rr))
+| BinaryNode(l, Add, BinaryNode(rl, Multi, rr)) when l = rr -> BinaryNode(BinaryNode(rl, Add, Leaf(Const(1.))), Multi, l)
+| BinaryNode(l, Add, BinaryNode(rl, Multi, rr)) when l = rl -> BinaryNode(BinaryNode(rr, Add, Leaf(Const(1.))), Multi, l)
+| BinaryNode(BinaryNode(ll, Multi, lr), Add, r) when r = ll -> BinaryNode(BinaryNode(lr, Add, Leaf(Const(1.))), Multi, r)
+| BinaryNode(BinaryNode(ll, Multi, lr), Add, r) when r = lr -> BinaryNode(BinaryNode(ll, Add, Leaf(Const(1.))), Multi, r)
+| other -> other
+)
 
 let rec reduce = tree_map_d (function
 | BinaryNode(Leaf(Const(l)), Add, Leaf(Const(r))) -> Leaf(Const(Float.add l r))

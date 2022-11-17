@@ -55,6 +55,13 @@ let do_magic a = remove_unary a
   |> group_exp
   |> reduce;;
 
+let pretty_print_expr e = do_magic e
+|> put_unary
+|> factorize_out
+|> put_minus
+|> put_div
+|> print_expr;;
+
 let tree = Sys.argv.(1)
   |> from_equation
   |> lex
@@ -84,7 +91,7 @@ match tree with Leaf(Const(0.)) -> printf "All real numbers are solutions\n" | _
 (*print_float poly2.(0); print_newline ();*)
 
 solve_poly2 (poly2.(2), poly2.(1), poly2.(0)) |> function
-  | [a; b] -> print_endline "the two solutions are:"; print_expr (do_magic a); print_newline ();print_expr (do_magic b); print_newline ();
-  | [a] -> print_endline "the solution is:";print_expr (do_magic a); print_newline ();
+  | [a; b] -> print_endline "the two solutions are:"; pretty_print_expr a; print_newline ();pretty_print_expr b; print_newline ();
+  | [a] -> print_endline "the solution is:";pretty_print_expr a; print_newline ();
   | [] -> print_endline "their is no solution";
   | _ -> () (* Unreached *)
