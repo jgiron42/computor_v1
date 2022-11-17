@@ -38,8 +38,8 @@ let solve_poly2 = function
     | n when (Float.compare n  0.) > 0 -> print_string "Discriminant is strictly positive, ";
     [(s_to_tree (sprintf "(-%f-(%f^0.5))/(2 * %f)" b delta a)); (s_to_tree(sprintf "(-%f+%f^0.5)/(2 * %f)" b delta a))]
     | n when (Float.compare n  0.) == 0 -> print_string "Discriminant is null, ";[(s_to_tree(sprintf "(-%f)/(2 * %f)" b a)) ]
-(*    | n when (Float.compare n  0.) < 0 -> print_string "Discriminant is strictly negative, ";*)
-(*    [(s_to_tree (sprintf "(-%f-(%f^0.5))/(2 * %f)" b delta a)); (s_to_tree(sprintf "(-%f+%f^0.5)/(2 * %f)" b delta a))]*)
+    | n when (Float.compare n  0.) < 0 -> print_string "Discriminant is strictly negative, ";
+    [(s_to_tree (sprintf "(-%f-i*((-%f)^0.5))/(2 * %f)" b delta a)); (s_to_tree(sprintf "(-%f+i*(-%f)^0.5)/(2 * %f)" b delta a))]
     | _ -> [])
 
 let rec pretty_print_poly = function
