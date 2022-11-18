@@ -269,7 +269,10 @@ let rec reduce = tree_map_d (function
 | BinaryNode(Leaf(Const(l)), Sub, Leaf(Const(r))) -> Leaf(Const(Float.sub l r))
 | BinaryNode(Leaf(Const(l)), Div, Leaf(Const(r)))
   when (Float.compare (Float.rem l r) 0.) == 0
-  -> Leaf(Const(Float.mul l r))
+  -> Leaf(Const(Float.div l r))
+| BinaryNode(Leaf(Const(l)), Exp, Leaf(Const(r)))
+  when ((Float.compare (Float.rem 1. r) 0.) == 0 && (Float.compare (Float.pow (Float.pow l r) (1. /. r)) l) == 0)
+  -> Leaf(Const(Float.pow l r))
 | UnaryNode(Opp, Leaf(Const(v))) -> Leaf(Const(Float.neg v))
 | other -> other)
 ;;
@@ -278,7 +281,7 @@ let rec simplify = tree_map_d (function
 | BinaryNode(_, Exp, Leaf(Const(0.))) -> Leaf(Const(1.))
 | BinaryNode(r, Exp, Leaf(Const(1.))) -> r
 | BinaryNode(Leaf(Const(0.)), Exp, _) -> Leaf(Const(0.))
-| BinaryNode(Leaf(Const(1.)), Exp, _) -> Leaf(Const(1.2))
+| BinaryNode(Leaf(Const(1.)), Exp, _) -> Leaf(Const(1.))
 | BinaryNode(_, Multi, Leaf(Const(0.))) -> Leaf(Const(0.))
 | BinaryNode(Leaf(Const(0.)), Multi, _) -> Leaf(Const(0.))
 | BinaryNode(r, Multi, Leaf(Const(1.))) -> r
@@ -290,12 +293,12 @@ let factorize = tree_map_d (function
 | BinaryNode(l, Add, r)
   when l = r
   -> normalize (BinaryNode(Leaf(Const(2.)), Multi, l))
-| BinaryNode(ll, Multi, BinaryNode(Leaf(Const(n)), Add, r))
+| BinaryNode(ll, Add, BinaryNode(Leaf(Const(n)), Multi, r))
   when ll = r
-  -> normalize (BinaryNode(ll, Multi, Leaf(Const(n+.1.))))
-| BinaryNode(BinaryNode(Leaf(Const(n)), Multi, lr), Add, r)
-  when lr = r
-  -> normalize (BinaryNode(Leaf(Const(n+.1.)), Multi, lr))
+  -> normalize (BinaryNode(r, Multi, Leaf(Const(n+.1.))))
+| BinaryNode(BinaryNode(ll, Multi, Leaf(Const(n))), Add, r)
+  when ll = r
+  -> normalize (BinaryNode(r, Multi, Leaf(Const(n+.1.))))
 | other -> other
 );;
 

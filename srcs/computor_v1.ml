@@ -28,6 +28,12 @@ let rec tree_degree = function
 | _ :: next -> tree_degree next
 ;;
 
+let rec poly_degree ?(n=0.) = function
+| [] -> 0.
+| 0. :: r -> poly_degree ~n:(n +. 1.) r
+| _ :: r -> Float.max n (poly_degree ~n:(n +. 1.) r)
+;;
+
 let solve_poly1 (a, b) = 
   if (compare a 0.) = 0 then []
   else [s_to_tree (sprintf "(-%f)/%f" b a)]
@@ -53,12 +59,13 @@ let do_magic a = remove_unary a
   |> simplify
   |> factorize
   |> group_exp
+  |> simplify
   |> reduce;;
 
 let pretty_print_expr e = do_magic e
 |> put_unary
-|> factorize_out
 |> put_minus
+|> factorize_out
 |> put_div
 |> print_expr;;
 
@@ -69,17 +76,17 @@ let tree = Sys.argv.(1)
   |> parse
   |> do_magic;;
 
-let sum = get_sum tree 
+let sum = get_sum tree;;
 
-let degree = tree_degree sum;;
-
-if degree > 2. then (Printf.fprintf stderr "The polynomial degree is strictly greater than 2, I can't solve.\n" ;exit 1);;
+if (tree_degree sum) > 2. then (Printf.fprintf stderr "The polynomial degree is strictly greater than 2, I can't solve.\n" ;exit 1);;
 
 let poly2 = [|
             factors_of (Leaf(Const(1.))) sum |> eval_node;
             factors_of (Leaf(Variable("X"))) sum |> eval_node;
             factors_of (BinaryNode(Leaf(Variable("X")), Exp, Leaf(Const(2.)))) sum |> eval_node
             |];;
+
+let degree = poly_degree (Array.to_list poly2);;
 
 (printf "Reduced form: "; pretty_print_poly (List.filter (function | (0. , _) -> false | _ -> true) [(poly2.(0), 0); (poly2.(1), 1); (poly2.(2), 2)]));
 (print_string "Polynomial degree: "; print_float degree; print_newline ());
