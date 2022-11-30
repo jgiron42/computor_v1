@@ -28,6 +28,14 @@ let rec tree_degree = function
 | _ :: next -> tree_degree next
 ;;
 
+let rec has_extra_variables = function
+| Leaf(Variable(name)) when ((String.compare name "X") != 0) -> true
+| BinaryNode(l, _, r) -> ((has_extra_variables l) || (has_extra_variables r))
+| UnaryNode(_, n) -> (has_extra_variables n)
+| _ -> false
+;;
+
+
 let rec poly_degree ?(n=0.) = function
 | [] -> 0.
 | 0. :: r -> poly_degree ~n:(n +. 1.) r
@@ -63,11 +71,11 @@ let do_magic a = remove_unary a
   |> reduce;;
 
 let pretty_print_expr e = do_magic e
-|> put_unary
-|> put_minus
-|> factorize_out
-|> put_div
-|> print_expr;;
+  |> put_unary
+  |> put_minus
+  |> factorize_out
+  |> put_div
+  |> print_expr;;
 
 let tree = Sys.argv.(1)
   |> from_equation
@@ -77,6 +85,8 @@ let tree = Sys.argv.(1)
   |> do_magic;;
 
 let sum = get_sum tree;;
+
+if (has_extra_variables tree) then (Printf.fprintf stderr "The expression have other variables than X.\n" ;exit 1);;
 
 if (tree_degree sum) > 2. then (Printf.fprintf stderr "The polynomial degree is strictly greater than 2, I can't solve.\n" ;exit 1);;
 
