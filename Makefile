@@ -1,4 +1,4 @@
-NAME = computor_v1
+NAME = computor
 
 SRCS =	parser.ml \
 		lexer.ml \
