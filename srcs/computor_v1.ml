@@ -80,28 +80,22 @@ let pretty_print_expr e = do_magic e
   |> put_div
   |> print_expr
 
-let tree = (Sys.argv.(1)
-  |> from_equation
-  |> parse
-  |> do_magic)
-
-let sum = get_sum tree
-
-let () =
-	if ((Array.length Sys.argv) != 2) then (Printf.fprintf stderr "Invalid number of arguments\n" ;exit 1)
-	else if (has_extra_variables tree) then (Printf.fprintf stderr "The expression have other variables than X.\n" ;exit 1)
-	else if (tree_degree sum) > 2. then (Printf.fprintf stderr "The polynomial degree is strictly greater than 2, I can't solve.\n" ;exit 1)
-	else let poly2 = [|
+let () = if ((Array.length Sys.argv) != 2) then (Printf.fprintf stderr "Invalid number of arguments\n" ;exit 1)
+		 else let tree = (Sys.argv.(1) |> from_equation |> parse |> do_magic) in
+			let sum = get_sum tree in
+				if (has_extra_variables tree) then (Printf.fprintf stderr "The expression have other variables than X.\n" ;exit 1)
+				else if (tree_degree sum) > 2. then (Printf.fprintf stderr "The polynomial degree is strictly greater than 2, I can't solve.\n" ;exit 1)
+				else let poly2 = [|
 					factors_of (Leaf(Const(1.))) sum |> eval_node;
 					factors_of (Leaf(Variable("X"))) sum |> eval_node;
 					factors_of (BinaryNode(Leaf(Variable("X")), Exp, Leaf(Const(2.)))) sum |> eval_node
 					|] in
-			let degree = poly_degree (Array.to_list poly2) in
-				(printf "Reduced form: "; pretty_print_poly (List.filter (function | (0. , _) -> false | _ -> true) [(poly2.(0), 0); (poly2.(1), 1); (poly2.(2), 2)]));
-				(print_string "Polynomial degree: "; print_float degree; print_newline ());
-				match tree with Leaf(Const(0.)) -> printf "All real numbers are solutions\n" | _ ->
-					solve_poly2 (poly2.(2), poly2.(1), poly2.(0)) |> function
-					  | [a; b] -> print_endline "the two solutions are:"; pretty_print_expr a; print_newline ();pretty_print_expr b; print_newline ();
-					  | [a] -> print_endline "the solution is:";pretty_print_expr a; print_newline ();
-					  | [] -> print_endline "their is no solution";
-					  | _ -> () (* Unreached *)
+					let degree = poly_degree (Array.to_list poly2) in
+						(printf "Reduced form: "; pretty_print_poly (List.filter (function | (0. , _) -> false | _ -> true) [(poly2.(0), 0); (poly2.(1), 1); (poly2.(2), 2)]));
+						(print_string "Polynomial degree: "; print_float degree; print_newline ());
+						match tree with Leaf(Const(0.)) -> printf "All real numbers are solutions\n" | _ ->
+							solve_poly2 (poly2.(2), poly2.(1), poly2.(0)) |> function
+							  | [a; b] -> print_endline "the two solutions are:"; pretty_print_expr a; print_newline ();pretty_print_expr b; print_newline ();
+							  | [a] -> print_endline "the solution is:";pretty_print_expr a; print_newline ();
+							  | [] -> print_endline "their is no solution";
+							  | _ -> () (* Unreached *)
