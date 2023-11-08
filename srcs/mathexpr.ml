@@ -82,20 +82,17 @@ let put_unary = tree_map_a (function
 | BinaryNode(n, Exp, Leaf(Const(-1.))) -> UnaryNode(Invert, n)
 | other -> other)
 
-let remove_minus = tree_map_a (function
+let remove_minus : (float node -> float node) = tree_map_a (function
 | BinaryNode(a, Sub, b) -> BinaryNode(a, Add, UnaryNode(Opp, b))
-| Leaf(Const(1.)) -> Leaf(Const(1.)) (*for type inference TODO: remove*)
 | other -> other)
 
-let remove_div = tree_map_a (function
+let remove_div : (float node -> float node) = tree_map_a (function
 | BinaryNode(a, Div, b) -> BinaryNode(a, Multi, UnaryNode(Invert, b))
-| Leaf(Const(1.)) -> Leaf(Const(1.)) (*for type inference TODO: remove*)
 | other -> other)
 
-let put_minus = tree_map_a (function
+let put_minus : (float node -> float node) = tree_map_a (function
 | BinaryNode(a, Add, UnaryNode(Opp, b)) -> BinaryNode(a, Sub, b)
 | BinaryNode(UnaryNode(Opp, a), Add, b) -> BinaryNode(b, Sub, a)
-| Leaf(Const(1.)) -> Leaf(Const(1.)) (*for type inference TODO: remove*)
 | other -> other)
 
 let put_div = tree_map_a (function
