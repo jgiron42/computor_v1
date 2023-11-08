@@ -16,7 +16,7 @@ OBJS_DIR_TREE := $(sort $(addprefix ${OBJS_DIR}/, $(dir ${SRCS})))
 
 OBJS := $(SRCS:%.ml=${OBJS_DIR}/%.cmx)
 
-INTERS := $(SRCS:%.ml=${OBJS_DIR}/%.cmi)
+INTERS := $(INCLUDES:%.mli=${OBJS_DIR}/%.cmi) $(SRCS:%.ml=${OBJS_DIR}/%.cmi)
 
 all: $(NAME)
 
@@ -31,10 +31,19 @@ ${OBJS_DIR_TREE}:
 	mkdir -p $@
 
 ${OBJS_DIR}/%.cmx: ${SRCS_DIR}/%.ml
-	ocamlopt -c $< -o $@ -I ${OBJS_DIR}
+	ocamlopt -c $< -o $@ -I ${OBJS_DIR} -I ${SRCS_DIR}
 
 ${OBJS_DIR}/%.cmi: ${SRCS_DIR}/%.ml
-	ocamlopt -c $< -o $@ -I ${OBJS_DIR}
+	ocamlopt -c $< -o $@ -I ${OBJS_DIR} -I ${SRCS_DIR}
+
+${OBJS_DIR}/%.cmi: ${SRCS_DIR}/%.mli
+	ocamlopt -c $< -o $@ -I ${OBJS_DIR} -I ${SRCS_DIR}
+
+${SRCS_DIR}/%.ml: ${SRCS_DIR}/%.mly
+	ocamlyacc $<
+
+${SRCS_DIR}/%.ml: ${SRCS_DIR}/%.mll
+	ocamllex $<
 
 $(MAKE_DEP):
 	make -C $(dir $@) $(notdir $@)
