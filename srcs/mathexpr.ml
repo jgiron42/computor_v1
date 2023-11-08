@@ -15,26 +15,13 @@ let print_oper = function
 | Exp -> print_string "^"
 | Opp -> print_string "-"
 
-let rec print_lex = function
-| t :: r ->
-  (match t with
-  | BracketOpen -> print_string "BracketOpen: "; print_char '('; print_newline ()
-  | BracketClose -> print_string "BracketClose: "; print_char ')'; print_newline ()
-  | Value(Const(v)) -> print_string "Value: "; print_float v; print_newline ()
-  | Value(Variable(v)) -> print_string "Variable: "; print_string v; print_newline ()
-  | Oper(o) -> print_string "Oper: "; print_oper o; print_newline ()
-  | End -> print_endline "End"
-  ); print_lex r
-| [] -> ();;
-let rec print_stack s = if ((Stack.length s) == 0) then () else (print_lex [Stack.pop s]; print_stack s);;
+let rec print_spaces n = if (n > 0) then (print_char ' '; print_spaces (n - 1))
 
-let rec print_spaces n = if (n > 0) then (print_char ' '; print_spaces (n - 1));;
 let rec print_tree ?(n=0) = function
 | Leaf(Const(v)) -> print_spaces n; print_float v; print_newline ();
 | Leaf(Variable(v)) -> print_spaces n; print_string v; print_newline ();
 | BinaryNode(l, o, r) -> (print_tree ~n:(n + 1) l); print_spaces n;print_char 'b'; print_oper o; print_newline (); (print_tree ~n:(n + 1) r); 
-| UnaryNode(o, r) -> print_spaces n; print_char 'u'; print_oper o; (print_tree ~n:(n + 1) r);
-;;
+| UnaryNode(o, r) -> print_spaces n; print_char 'u'; print_oper o; (print_tree ~n:(n + 1) r)
 
 
 let rec print_expr = function
@@ -69,7 +56,6 @@ let rec tree_map_d f tree = f (match tree with
 | UnaryNode(o, n) -> (UnaryNode(o, tree_map_d f n))
 | BinaryNode(l, o, r) -> (BinaryNode(tree_map_d f l, o, tree_map_d f r))
 | other -> other)
-;;
 
 let rec eval_node_environ environ = function
 | Leaf(Const(v)) -> v
@@ -82,41 +68,52 @@ let rec eval_node_environ environ = function
 | UnaryNode(Opp, l) -> Float.neg (eval_node_environ environ l)
 | UnaryNode(Sub, l) -> Float.neg (eval_node_environ environ l)
 | UnaryNode(Invert, l) -> Float.div 1. (eval_node_environ environ l)
-| _ -> Float.nan (* Unreached *);;
+| _ -> Float.nan (* Unreached *)
 
 let eval_node = eval_node_environ (Hashtbl.create 10)
 
-let remove_unary = tree_map_a (function
+and remove_unary = tree_map_a (function
 | UnaryNode(Opp, n) -> BinaryNode(n, Multi, Leaf(Const(-1.)))
 | UnaryNode(Invert, n) -> BinaryNode(n, Exp, Leaf(Const(-1.)))
-| other -> other);;
+| other -> other)
 
 let put_unary = tree_map_a (function
 | BinaryNode(n, Multi, Leaf(Const(-1.))) -> UnaryNode(Opp, n)
 | BinaryNode(n, Exp, Leaf(Const(-1.))) -> UnaryNode(Invert, n)
-| other -> other);;
+| other -> other)
+
+let remove_minus = tree_map_a (function
+| BinaryNode(a, Sub, b) -> BinaryNode(a, Add, UnaryNode(Opp, b))
+| Leaf(Const(1.)) -> Leaf(Const(1.)) (*for type inference TODO: remove*)
+| other -> other)
+
+let remove_div = tree_map_a (function
+| BinaryNode(a, Div, b) -> BinaryNode(a, Multi, UnaryNode(Invert, b))
+| Leaf(Const(1.)) -> Leaf(Const(1.)) (*for type inference TODO: remove*)
+| other -> other)
 
 let put_minus = tree_map_a (function
 | BinaryNode(a, Add, UnaryNode(Opp, b)) -> BinaryNode(a, Sub, b)
 | BinaryNode(UnaryNode(Opp, a), Add, b) -> BinaryNode(b, Sub, a)
 | Leaf(Const(1.)) -> Leaf(Const(1.)) (*for type inference TODO: remove*)
-| other -> other);;
+| other -> other)
 
 let put_div = tree_map_a (function
 | BinaryNode(a, Multi, UnaryNode(Invert, b)) -> BinaryNode(a, Div, b)
 | BinaryNode(UnaryNode(Invert, a), Multi, b) -> BinaryNode(b, Div, a)
 | UnaryNode(Invert, n) -> BinaryNode(Leaf(Const(1.)), Div, n)
-| other -> other);;
+| other -> other)
 
 let expand node = tree_map_a (function
 | BinaryNode(l, Multi, BinaryNode(r1, Add, r2)) -> (BinaryNode(BinaryNode(l, Multi, r1), Add, BinaryNode(l, Multi, r2)))
 | BinaryNode(BinaryNode(r1, Add, r2), Multi, l) -> (BinaryNode(BinaryNode(l, Multi, r1), Add, BinaryNode(l, Multi, r2)))
-| other -> other) node;;
+| BinaryNode(BinaryNode(l1, Multi, l2), Exp, r) -> (BinaryNode(BinaryNode(l1, Exp, r), Multi, BinaryNode(l2, Exp, r)))
+| other -> other) node
 
 let rec prio ?(list=[Add; Multi; Exp]) x = match list with
 | [] -> 1;
 | e :: r when e = x -> 0;
-| _ :: r -> 1 + prio ~list:r x;;
+| _ :: r -> 1 + prio ~list:r x
 
 let rec expr_compare l r =
   match l with
@@ -135,7 +132,7 @@ let rec expr_compare l r =
     | Leaf(Variable(rv)) -> (compare lv rv) < 0
     | _ -> false
   )
-  | _ -> false;;
+  | _ -> false
 
 let  normalize = (let rec f = function
   | BinaryNode(l, ((Multi | Add) as op), r)
@@ -147,7 +144,7 @@ let  normalize = (let rec f = function
   | BinaryNode(BinaryNode(_, ((Multi | Add) as opl), _) as l, op, BinaryNode(rl, opr, rr))
     when ((opl = opr) && (opr = op))
     -> tree_map_d f (BinaryNode(BinaryNode(l, op, rl), op, rr))
-  | other -> other in tree_map_d f);;
+  | other -> other in tree_map_d f)
 
 let factorize_out = tree_map_d (function
 | BinaryNode(UnaryNode(Opp, l), Multi, UnaryNode(Opp, r)) -> BinaryNode(l, Multi, r)
@@ -171,26 +168,28 @@ let rec reduce = tree_map_d (function
 | BinaryNode(BinaryNode(_ as ll, Multi, Leaf(Const(lr))), Multi, Leaf(Const(r))) -> BinaryNode(ll, Multi, Leaf(Const(Float.mul lr r)))
 | BinaryNode(Leaf(Const(l)), Sub, Leaf(Const(r))) -> Leaf(Const(Float.sub l r))
 | BinaryNode(Leaf(Const(l)), Div, Leaf(Const(r)))
-  when (Float.compare (Float.rem l r) 0.) == 0
+  when (Float.compare (Float.mul (Float.div l r) r) l) == 0
   -> Leaf(Const(Float.div l r))
 | BinaryNode(Leaf(Const(l)), Exp, Leaf(Const(r)))
   when ((Float.compare (Float.rem 1. r) 0.) == 0 && (Float.compare (Float.pow (Float.pow l r) (1. /. r)) l) == 0)
   -> Leaf(Const(Float.pow l r))
 | UnaryNode(Opp, Leaf(Const(v))) -> Leaf(Const(Float.neg v))
 | other -> other)
-;;
+
 
 let rec simplify = tree_map_d (function
 | BinaryNode(_, Exp, Leaf(Const(0.))) -> Leaf(Const(1.))
 | BinaryNode(r, Exp, Leaf(Const(1.))) -> r
+| BinaryNode(Leaf(Const(0.)), Exp, Leaf(Const(c))) when ((Float.compare 0. c) > 0) ->  (Printf.fprintf stderr "Error: Division by zero.\n" ;exit 1)
 | BinaryNode(Leaf(Const(0.)), Exp, _) -> Leaf(Const(0.))
 | BinaryNode(Leaf(Const(1.)), Exp, _) -> Leaf(Const(1.))
 | BinaryNode(_, Multi, Leaf(Const(0.))) -> Leaf(Const(0.))
 | BinaryNode(Leaf(Const(0.)), Multi, _) -> Leaf(Const(0.))
 | BinaryNode(r, Multi, Leaf(Const(1.))) -> r
 | BinaryNode(Leaf(Const(1.)), Multi, r) -> r
+| BinaryNode(l, Add, Leaf(Const(0.))) -> l
 | other -> other)
-;;
+
 
 let factorize = tree_map_d (function
 | BinaryNode(l, Add, r)
@@ -203,7 +202,7 @@ let factorize = tree_map_d (function
   when ll = r
   -> normalize (BinaryNode(r, Multi, Leaf(Const(n+.1.))))
 | other -> other
-);;
+)
 
 let group_exp = tree_map_d (function
 | BinaryNode(l, Multi, r)
@@ -213,10 +212,10 @@ let group_exp = tree_map_d (function
   when ll = r
   -> normalize (BinaryNode(ll, Exp, Leaf(Const(n+.1.))))
 | other -> other
-);;
+)
 
 let rec has_variable = function
 | Leaf(Variable _) -> true
 | BinaryNode(l, _, r) -> (has_variable l) ||  (has_variable r)
 | UnaryNode(_, n) -> (has_variable n)
-| _ -> false;;
+| _ -> false
