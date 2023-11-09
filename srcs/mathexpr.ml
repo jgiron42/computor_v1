@@ -7,9 +7,9 @@ type 'a operation_class =
 
 
 let string_of_oper = function
-| Add -> "+"
-| Sub -> "-"
-| Multi -> "*"
+| Plus -> "+"
+| Minus -> "-"
+| Times -> "*"
 | Div -> "/"
 | Invert -> "i"
 | Exp -> "^"
@@ -29,23 +29,23 @@ let rec string_of_expr  ?(op='+') = function
 | Leaf(Const(v)) -> Printf.sprintf "%g" v;
 | Leaf(Variable(v)) ->  v;
 | BinaryNode(l, o, r) -> ((match o with
-  | Add | Sub -> (string_of_expr l)
-  | Multi | Div -> (match l with
-    | BinaryNode(_, (Add | Sub | Div), _) -> "(" ^ string_of_expr l ^ ")"
+  | Plus | Minus -> (string_of_expr l)
+  | Times | Div -> (match l with
+    | BinaryNode(_, (Plus | Minus | Div), _) -> "(" ^ string_of_expr l ^ ")"
     | _ -> string_of_expr l)
   | Exp -> (match l with
-    | BinaryNode(_, (Add | Sub | Div | Multi | Exp), _) -> "(" ^ string_of_expr l ^ ")"
+    | BinaryNode(_, (Plus | Minus | Div | Times | Exp), _) -> "(" ^ string_of_expr l ^ ")"
     | _ -> string_of_expr l)
   | _ -> string_of_expr l)
    ^ (string_of_oper o) ^
   (match o with
-    | Add -> (string_of_expr r)
-    | Sub ->  "(" ^ string_of_expr r ^ ")"
-    | Multi | Div -> (match r with
-      | BinaryNode(_, (Add | Sub | Div | Multi), _) -> "(" ^ string_of_expr r ^ ")"
+    | Plus -> (string_of_expr r)
+    | Minus ->  "(" ^ string_of_expr r ^ ")"
+    | Times | Div -> (match r with
+      | BinaryNode(_, (Plus | Minus | Div | Times), _) -> "(" ^ string_of_expr r ^ ")"
       | _ -> string_of_expr r)
     | Exp -> (match r with
-      | BinaryNode(_, (Add | Sub | Div | Multi), _) -> "(" ^ string_of_expr r ^ ")"
+      | BinaryNode(_, (Plus | Minus | Div | Times), _) -> "(" ^ string_of_expr r ^ ")"
       | _ -> string_of_expr r)
     | _ -> string_of_expr r)
     )
@@ -89,54 +89,54 @@ let rec map_until f tree = let tree2 = f tree in
 let rec eval_node_environ environ = function
 | Leaf(Const(v)) -> v
 | Leaf(Variable(v)) -> Hashtbl.find environ v
-| BinaryNode(l, Add, r) -> Float.add (eval_node_environ environ l) (eval_node_environ environ r)
-| BinaryNode(l, Sub, r) -> Float.sub (eval_node_environ environ l) (eval_node_environ environ r)
-| BinaryNode(l, Multi, r) -> Float.mul (eval_node_environ environ l) (eval_node_environ environ r)
+| BinaryNode(l, Plus, r) -> Float.add (eval_node_environ environ l) (eval_node_environ environ r)
+| BinaryNode(l, Minus, r) -> Float.sub (eval_node_environ environ l) (eval_node_environ environ r)
+| BinaryNode(l, Times, r) -> Float.mul (eval_node_environ environ l) (eval_node_environ environ r)
 | BinaryNode(l, Div, r) -> Float.div (eval_node_environ environ l) (eval_node_environ environ r)
 | BinaryNode(l, Exp, r) -> Float.pow (eval_node_environ environ l) (eval_node_environ environ r)
 | UnaryNode(Opp, l) -> Float.neg (eval_node_environ environ l)
-| UnaryNode(Sub, l) -> Float.neg (eval_node_environ environ l)
+| UnaryNode(Minus, l) -> Float.neg (eval_node_environ environ l)
 | UnaryNode(Invert, l) -> Float.div 1. (eval_node_environ environ l)
 | _ -> Float.nan (* Unreached *)
 
 let eval_node = eval_node_environ (Hashtbl.create 10)
 
 and remove_unary = tree_map_a (function
-| UnaryNode(Opp, n) -> BinaryNode(n, Multi, Leaf(Const(-1.)))
+| UnaryNode(Opp, n) -> BinaryNode(n, Times, Leaf(Const(-1.)))
 | UnaryNode(Invert, n) -> BinaryNode(n, Exp, Leaf(Const(-1.)))
 | other -> other)
 
 let put_unary = tree_map_a (function
-| BinaryNode(n, Multi, Leaf(Const(-1.))) -> UnaryNode(Opp, n)
+| BinaryNode(n, Times, Leaf(Const(-1.))) -> UnaryNode(Opp, n)
 | BinaryNode(n, Exp, Leaf(Const(-1.))) -> UnaryNode(Invert, n)
 | other -> other)
 
 let remove_minus : (float node -> float node) = tree_map_a (function
-| BinaryNode(a, Sub, b) -> BinaryNode(a, Add, UnaryNode(Opp, b))
+| BinaryNode(a, Minus, b) -> BinaryNode(a, Plus, UnaryNode(Opp, b))
 | other -> other)
 
 let remove_div : (float node -> float node) = tree_map_a (function
-| BinaryNode(a, Div, b) -> BinaryNode(a, Multi, UnaryNode(Invert, b))
+| BinaryNode(a, Div, b) -> BinaryNode(a, Times, UnaryNode(Invert, b))
 | other -> other)
 
 let put_minus : (float node -> float node) = tree_map_a (function
-| BinaryNode(a, Add, UnaryNode(Opp, b)) -> BinaryNode(a, Sub, b)
-| BinaryNode(UnaryNode(Opp, a), Add, b) -> BinaryNode(b, Sub, a)
+| BinaryNode(a, Plus, UnaryNode(Opp, b)) -> BinaryNode(a, Minus, b)
+| BinaryNode(UnaryNode(Opp, a), Plus, b) -> BinaryNode(b, Minus, a)
 | other -> other)
 
 let put_div = tree_map_a (function
-| BinaryNode(a, Multi, UnaryNode(Invert, b)) -> BinaryNode(a, Div, b)
-| BinaryNode(UnaryNode(Invert, a), Multi, b) -> BinaryNode(b, Div, a)
+| BinaryNode(a, Times, UnaryNode(Invert, b)) -> BinaryNode(a, Div, b)
+| BinaryNode(UnaryNode(Invert, a), Times, b) -> BinaryNode(b, Div, a)
 | UnaryNode(Invert, n) -> BinaryNode(Leaf(Const(1.)), Div, n)
 | other -> other)
 
 let expand node = tree_map_a (function
-| BinaryNode(l, Multi, BinaryNode(r1, Add, r2)) -> (BinaryNode(BinaryNode(l, Multi, r1), Add, BinaryNode(l, Multi, r2)))
-| BinaryNode(BinaryNode(r1, Add, r2), Multi, l) -> (BinaryNode(BinaryNode(l, Multi, r1), Add, BinaryNode(l, Multi, r2)))
-| BinaryNode(BinaryNode(l1, Multi, l2), Exp, r) -> (BinaryNode(BinaryNode(l1, Exp, r), Multi, BinaryNode(l2, Exp, r)))
+| BinaryNode(l, Times, BinaryNode(r1, Plus, r2)) -> (BinaryNode(BinaryNode(l, Times, r1), Plus, BinaryNode(l, Times, r2)))
+| BinaryNode(BinaryNode(r1, Plus, r2), Times, l) -> (BinaryNode(BinaryNode(l, Times, r1), Plus, BinaryNode(l, Times, r2)))
+| BinaryNode(BinaryNode(l1, Times, l2), Exp, r) -> (BinaryNode(BinaryNode(l1, Exp, r), Times, BinaryNode(l2, Exp, r)))
 | other -> other) node
 
-let rec prio ?(list=[Add; Multi; Exp]) x = match list with
+let rec prio ?(list=[Plus; Times; Exp]) x = match list with
 | [] -> 1;
 | e :: r when e = x -> 0;
 | _ :: r -> 1 + prio ~list:r x
@@ -161,36 +161,36 @@ let rec expr_compare l r =
   | _ -> false
 
 let  normalize = (let rec f = function
-  | BinaryNode(l, ((Multi | Add) as op), r)
+  | BinaryNode(l, ((Times | Plus) as op), r)
     when (expr_compare l r)
     -> tree_map_d f (BinaryNode(r, op, l))
-  | BinaryNode(BinaryNode(ll, opl, lr), ((Multi | Add) as op), r)
+  | BinaryNode(BinaryNode(ll, opl, lr), ((Times | Plus) as op), r)
     when ((opl = op) && (expr_compare lr r))
     -> tree_map_d f (BinaryNode(BinaryNode(ll, opl, r), op, lr))
-  | BinaryNode(BinaryNode(_, ((Multi | Add) as opl), _) as l, op, BinaryNode(rl, opr, rr))
+  | BinaryNode(BinaryNode(_, ((Times | Plus) as opl), _) as l, op, BinaryNode(rl, opr, rr))
     when ((opl = opr) && (opr = op))
     -> tree_map_d f (BinaryNode(BinaryNode(l, op, rl), op, rr))
   | other -> other in tree_map_d f)
 
 let factorize_out = tree_map_d (function
-| BinaryNode(UnaryNode(Opp, l), Multi, UnaryNode(Opp, r)) -> BinaryNode(l, Multi, r)
-| BinaryNode(UnaryNode(Opp, l), Add, UnaryNode(Opp, r)) -> UnaryNode(Opp, BinaryNode(l, Add, r))
-| BinaryNode(UnaryNode(Opp, l), Multi, r)
-| BinaryNode(l, Multi, UnaryNode(Opp, r)) -> UnaryNode(Opp, BinaryNode(l, Multi, r))
-| BinaryNode(l, Multi, (UnaryNode(Invert, _) as r)) -> BinaryNode(r, Multi, l)
-| BinaryNode(BinaryNode(UnaryNode(Invert, _) as ll, Multi, (_ as lr)), Multi, r) -> BinaryNode(ll, Multi, BinaryNode(lr, Multi, r))
-| BinaryNode(l, Multi, BinaryNode(UnaryNode(Invert, _) as rl, Multi, (_ as rr))) -> BinaryNode(rl, Multi, BinaryNode(l, Multi, rr))
-| BinaryNode(l, Add, BinaryNode(rl, Multi, rr)) when l = rr -> BinaryNode(BinaryNode(rl, Add, Leaf(Const(1.))), Multi, l)
-| BinaryNode(l, Add, BinaryNode(rl, Multi, rr)) when l = rl -> BinaryNode(BinaryNode(rr, Add, Leaf(Const(1.))), Multi, l)
-| BinaryNode(BinaryNode(ll, Multi, lr), Add, r) when r = ll -> BinaryNode(BinaryNode(lr, Add, Leaf(Const(1.))), Multi, r)
-| BinaryNode(BinaryNode(ll, Multi, lr), Add, r) when r = lr -> BinaryNode(BinaryNode(ll, Add, Leaf(Const(1.))), Multi, r)
+| BinaryNode(UnaryNode(Opp, l), Times, UnaryNode(Opp, r)) -> BinaryNode(l, Times, r)
+| BinaryNode(UnaryNode(Opp, l), Plus, UnaryNode(Opp, r)) -> UnaryNode(Opp, BinaryNode(l, Plus, r))
+| BinaryNode(UnaryNode(Opp, l), Times, r)
+| BinaryNode(l, Times, UnaryNode(Opp, r)) -> UnaryNode(Opp, BinaryNode(l, Times, r))
+| BinaryNode(l, Times, (UnaryNode(Invert, _) as r)) -> BinaryNode(r, Times, l)
+| BinaryNode(BinaryNode(UnaryNode(Invert, _) as ll, Times, (_ as lr)), Times, r) -> BinaryNode(ll, Times, BinaryNode(lr, Times, r))
+| BinaryNode(l, Times, BinaryNode(UnaryNode(Invert, _) as rl, Times, (_ as rr))) -> BinaryNode(rl, Times, BinaryNode(l, Times, rr))
+| BinaryNode(l, Plus, BinaryNode(rl, Times, rr)) when l = rr -> BinaryNode(BinaryNode(rl, Plus, Leaf(Const(1.))), Times, l)
+| BinaryNode(l, Plus, BinaryNode(rl, Times, rr)) when l = rl -> BinaryNode(BinaryNode(rr, Plus, Leaf(Const(1.))), Times, l)
+| BinaryNode(BinaryNode(ll, Times, lr), Plus, r) when r = ll -> BinaryNode(BinaryNode(lr, Plus, Leaf(Const(1.))), Times, r)
+| BinaryNode(BinaryNode(ll, Times, lr), Plus, r) when r = lr -> BinaryNode(BinaryNode(ll, Plus, Leaf(Const(1.))), Times, r)
 | other -> other
 )
 
 let factorize_div : (float node -> float node) = tree_map_d (function
-| BinaryNode(BinaryNode(ll, Div, lr), Multi, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(ll, Multi, rl), Div, BinaryNode(lr, Multi, rr))
-| BinaryNode(BinaryNode(ll, Div, lr), Multi, r) -> BinaryNode(BinaryNode(ll, Multi, r), Div, lr)
-| BinaryNode(l, Multi, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(l, Multi, rl), Div, rr)
+| BinaryNode(BinaryNode(ll, Div, lr), Times, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(ll, Times, rl), Div, BinaryNode(lr, Times, rr))
+| BinaryNode(BinaryNode(ll, Div, lr), Times, r) -> BinaryNode(BinaryNode(ll, Times, r), Div, lr)
+| BinaryNode(l, Times, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(l, Times, rl), Div, rr)
 | other -> other
 )
 
@@ -201,22 +201,22 @@ let test_precision_lost f a b = feclearexcept 61; f a b; (Int.to_string (feteste
 let test_fraction f a b = (Float.equal (Float.of_int (Float.to_int (f a b))) (f a b))
 
 let rec reduce_one = function
-| BinaryNode(BinaryNode(ll, Div, lr), Multi, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(ll, Multi, rl), Div, BinaryNode(lr, Multi, rr))
-| BinaryNode(BinaryNode(ll, Div, lr), Multi, r) -> BinaryNode(BinaryNode(ll, Multi, r), Div, lr)
-| BinaryNode(l, Multi, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(l, Multi, rl), Div, rr)
-| BinaryNode(BinaryNode(ll, Div, lr), Add, BinaryNode(rl, Div, rr)) when (lr = rr) -> BinaryNode(BinaryNode(ll, Add, rl), Div, lr)
-| BinaryNode(BinaryNode(ll, Div, lr), Sub, BinaryNode(rl, Div, rr)) when (lr = rr) -> BinaryNode(BinaryNode(ll, Sub, rl), Div, lr)
+| BinaryNode(BinaryNode(ll, Div, lr), Times, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(ll, Times, rl), Div, BinaryNode(lr, Times, rr))
+| BinaryNode(BinaryNode(ll, Div, lr), Times, r) -> BinaryNode(BinaryNode(ll, Times, r), Div, lr)
+| BinaryNode(l, Times, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(l, Times, rl), Div, rr)
+| BinaryNode(BinaryNode(ll, Div, lr), Plus, BinaryNode(rl, Div, rr)) when (lr = rr) -> BinaryNode(BinaryNode(ll, Plus, rl), Div, lr)
+| BinaryNode(BinaryNode(ll, Div, lr), Minus, BinaryNode(rl, Div, rr)) when (lr = rr) -> BinaryNode(BinaryNode(ll, Minus, rl), Div, lr)
 
-| BinaryNode(Leaf(Const(l)), Add, Leaf(Const(r))) -> Leaf(Const(Float.add l r))
-| BinaryNode(Leaf(Const(l)), Multi, Leaf(Const(r))) -> Leaf(Const(Float.mul l r))
-| BinaryNode(BinaryNode(_ as ll, Add, Leaf(Const(lr))), Add, Leaf(Const(r))) -> BinaryNode(ll, Add, Leaf(Const(Float.add lr r)))
-| BinaryNode(BinaryNode(_ as ll, Multi, Leaf(Const(lr))), Multi, Leaf(Const(r))) -> BinaryNode(ll, Multi, Leaf(Const(Float.mul lr r)))
-| BinaryNode(Leaf(Const(l)), Sub, Leaf(Const(r))) -> Leaf(Const(Float.sub l r))
+| BinaryNode(Leaf(Const(l)), Plus, Leaf(Const(r))) -> Leaf(Const(Float.add l r))
+| BinaryNode(Leaf(Const(l)), Times, Leaf(Const(r))) -> Leaf(Const(Float.mul l r))
+| BinaryNode(BinaryNode(_ as ll, Plus, Leaf(Const(lr))), Plus, Leaf(Const(r))) -> BinaryNode(ll, Plus, Leaf(Const(Float.add lr r)))
+| BinaryNode(BinaryNode(_ as ll, Times, Leaf(Const(lr))), Times, Leaf(Const(r))) -> BinaryNode(ll, Times, Leaf(Const(Float.mul lr r)))
+| BinaryNode(Leaf(Const(l)), Minus, Leaf(Const(r))) -> Leaf(Const(Float.sub l r))
 | BinaryNode(Leaf(Const(l)), Div, Leaf(Const(r)))
 (*  when (test_precision_lost Float.div l r) *)
   when (test_fraction Float.div l r)
   -> Leaf(Const(Float.div l r))
-| BinaryNode(BinaryNode(ll, Div, (Leaf(Const(_)) as lr)), Div, (Leaf(Const(_)) as r)) -> (BinaryNode(ll, Div, BinaryNode(lr, Multi, r)))
+| BinaryNode(BinaryNode(ll, Div, (Leaf(Const(_)) as lr)), Div, (Leaf(Const(_)) as r)) -> (BinaryNode(ll, Div, BinaryNode(lr, Times, r)))
 | BinaryNode(Leaf(Const(l)), Exp, Leaf(Const(r)))
 (*  when (test_precision_lost Float.pow l r) *)
   when (test_fraction Float.pow l r)
@@ -227,13 +227,13 @@ let rec reduce_one = function
   -> Leaf(Const(Float.pow l (rl /. rr)))
 
 | UnaryNode(Opp, Leaf(Const(v))) -> Leaf(Const(Float.neg v))
-| BinaryNode(l, Sub, Leaf(Const(r))) when ((Float.compare r 0.) < 0) -> BinaryNode(l, Add, Leaf(Const(Float.neg r)))
+| BinaryNode(l, Minus, Leaf(Const(r))) when ((Float.compare r 0.) < 0) -> BinaryNode(l, Plus, Leaf(Const(Float.neg r)))
 
-| BinaryNode(UnaryNode(Opp, rl), Add, rr) -> BinaryNode(rr, Sub, rl)
-| UnaryNode(Opp, BinaryNode(UnaryNode(Opp, l), Sub, r)) -> BinaryNode(r, Add, l)
+| BinaryNode(UnaryNode(Opp, rl), Plus, rr) -> BinaryNode(rr, Minus, rl)
+| UnaryNode(Opp, BinaryNode(UnaryNode(Opp, l), Minus, r)) -> BinaryNode(r, Plus, l)
 | UnaryNode(Opp, BinaryNode(l, Div, r)) -> BinaryNode(UnaryNode(Opp, l), Div, r)
-| UnaryNode(Opp, BinaryNode(l, Add, r)) -> BinaryNode(UnaryNode(Opp, l), Sub, r)
-| UnaryNode(Opp, BinaryNode(l, Sub, r)) -> BinaryNode(r, Sub, l)
+| UnaryNode(Opp, BinaryNode(l, Plus, r)) -> BinaryNode(UnaryNode(Opp, l), Minus, r)
+| UnaryNode(Opp, BinaryNode(l, Minus, r)) -> BinaryNode(r, Minus, l)
 | other -> other
 
 let rec reduce_d = tree_map_d reduce_one
@@ -246,37 +246,37 @@ let rec simplify = tree_map_d (function
 | BinaryNode(Leaf(Const(0.)), Exp, Leaf(Const(c))) when ((Float.compare 0. c) > 0) ->  (Printf.fprintf stderr "Error: Division by zero.\n" ;exit 1)
 | BinaryNode(Leaf(Const(0.)), Exp, _) -> Leaf(Const(0.))
 | BinaryNode(Leaf(Const(1.)), Exp, _) -> Leaf(Const(1.))
-| BinaryNode(_, Multi, Leaf(Const(0.))) -> Leaf(Const(0.))
-| BinaryNode(Leaf(Const(0.)), Multi, _) -> Leaf(Const(0.))
-| BinaryNode(r, Multi, Leaf(Const(1.))) -> r
-| BinaryNode(Leaf(Const(1.)), Multi, r) -> r
-| BinaryNode(l, Add, Leaf(Const(0.))) -> l
+| BinaryNode(_, Times, Leaf(Const(0.))) -> Leaf(Const(0.))
+| BinaryNode(Leaf(Const(0.)), Times, _) -> Leaf(Const(0.))
+| BinaryNode(r, Times, Leaf(Const(1.))) -> r
+| BinaryNode(Leaf(Const(1.)), Times, r) -> r
+| BinaryNode(l, Plus, Leaf(Const(0.))) -> l
 | other -> other)
 
 
 let factorize = tree_map_d (function
-| BinaryNode(l, Add, r)
+| BinaryNode(l, Plus, r)
   when l = r
-  -> normalize (BinaryNode(Leaf(Const(2.)), Multi, l))
-| BinaryNode(ll, Add, BinaryNode(Leaf(Const(n)), Multi, r))
+  -> normalize (BinaryNode(Leaf(Const(2.)), Times, l))
+| BinaryNode(ll, Plus, BinaryNode(Leaf(Const(n)), Times, r))
   when ll = r
-  -> normalize (BinaryNode(r, Multi, Leaf(Const(n+.1.))))
-| BinaryNode(BinaryNode(ll, Multi, Leaf(Const(n))), Add, r)
+  -> normalize (BinaryNode(r, Times, Leaf(Const(n+.1.))))
+| BinaryNode(BinaryNode(ll, Times, Leaf(Const(n))), Plus, r)
   when ll = r
-  -> normalize (BinaryNode(r, Multi, Leaf(Const(n+.1.))))
+  -> normalize (BinaryNode(r, Times, Leaf(Const(n+.1.))))
 | other -> other
 )
 
 let group_exp = tree_map_d (function
-| BinaryNode(l, Multi, r)
+| BinaryNode(l, Times, r)
   when l = r
   -> normalize (BinaryNode(l, Exp, Leaf(Const(2.))))
-| BinaryNode(BinaryNode(ll, Exp, nl), Multi, r)
+| BinaryNode(BinaryNode(ll, Exp, nl), Times, r)
   when ll = r
-  -> normalize (BinaryNode(ll, Exp, BinaryNode(nl, Add, Leaf(Const(1.)))))
-| BinaryNode(BinaryNode(ll, Exp, lr), Multi, BinaryNode(rl, Exp, rr))
+  -> normalize (BinaryNode(ll, Exp, BinaryNode(nl, Plus, Leaf(Const(1.)))))
+| BinaryNode(BinaryNode(ll, Exp, lr), Times, BinaryNode(rl, Exp, rr))
   when ll = rl
-  -> normalize (BinaryNode(ll, Exp, BinaryNode(lr, Add, rr)))
+  -> normalize (BinaryNode(ll, Exp, BinaryNode(lr, Plus, rr)))
 | other -> other
 )
 

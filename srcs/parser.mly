@@ -19,11 +19,11 @@ main:
 expr:
 	VAL                     { Tree.Leaf($1) }
   | LPAREN expr RPAREN      { $2 }
-  | expr PLUS expr          { Tree.BinaryNode($1, Add, $3) }
-//  | expr MINUS expr         { Tree.BinaryNode($1, Add, Tree.UnaryNode(Opp, $3)) }
-  | expr MINUS expr         { Tree.BinaryNode($1, Sub, $3) }
-  | expr TIMES expr         { Tree.BinaryNode($1, Multi, $3) }
-//  | expr DIV expr         { Tree.BinaryNode($1, Multi, Tree.UnaryNode(Invert, $3)) }
+  | expr PLUS expr          { Tree.BinaryNode($1, Plus, $3) }
+//  | expr MINUS expr         { Tree.BinaryNode($1, Plus, Tree.UnaryNode(Opp, $3)) }
+  | expr MINUS expr         { Tree.BinaryNode($1, Minus, $3) }
+  | expr TIMES expr         { Tree.BinaryNode($1, Times, $3) }
+//  | expr DIV expr         { Tree.BinaryNode($1, Times, Tree.UnaryNode(Invert, $3)) }
   | expr DIV expr           { Tree.BinaryNode($1, Div, $3) }
   | expr EXP expr         { Tree.BinaryNode($1, Exp, $3) }
   | MINUS expr %prec UMINUS { Tree.UnaryNode(Opp, $2) }

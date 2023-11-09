@@ -1,8 +1,8 @@
 
 type operation =
-| Add
-| Sub
-| Multi
+| Plus
+| Minus
+| Times
 | Div
 | Exp
 | Opp

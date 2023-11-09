@@ -12,21 +12,21 @@ let from_equation s = match (String.split_on_char '=' s) with
   | _ -> (Printf.fprintf stderr "No equal\n" ;exit 1)
 
 let rec get_sum = function
-| BinaryNode(l, Add, r) -> List.concat [(get_sum l); (get_sum r)]
+| BinaryNode(l, Plus, r) -> List.concat [(get_sum l); (get_sum r)]
 | other -> [other]
 
 let rec factors_of f = function
 | [] -> Leaf(Const(0.))
-| any :: next when (Leaf(Const(1.)) = f && not (has_variable any)) -> BinaryNode(any, Add, (factors_of f next))
-| any :: next when any = f -> BinaryNode(Leaf(Const(1.)), Add, (factors_of f next))
-| (BinaryNode(l, Multi, r)) :: next when (l = f && not (has_variable r)) -> BinaryNode(r, Add, (factors_of f next))
-| (BinaryNode(l, Multi, r)) :: next when (r = f && not (has_variable l)) -> BinaryNode(l, Add, (factors_of f next))
+| any :: next when (Leaf(Const(1.)) = f && not (has_variable any)) -> BinaryNode(any, Plus, (factors_of f next))
+| any :: next when any = f -> BinaryNode(Leaf(Const(1.)), Plus, (factors_of f next))
+| (BinaryNode(l, Times, r)) :: next when (l = f && not (has_variable r)) -> BinaryNode(r, Plus, (factors_of f next))
+| (BinaryNode(l, Times, r)) :: next when (r = f && not (has_variable l)) -> BinaryNode(l, Plus, (factors_of f next))
 | _ :: next -> factors_of f next
 
 let rec tree_degree = function
 | [] -> 0.
-| BinaryNode(BinaryNode(Leaf(Variable("X")), Exp, Leaf(Const(degree))), Multi, _) :: next -> Float.max degree (tree_degree next)
-| BinaryNode(Leaf(Variable("X")), Multi, _) :: next -> Float.max 1. (tree_degree next)
+| BinaryNode(BinaryNode(Leaf(Variable("X")), Exp, Leaf(Const(degree))), Times, _) :: next -> Float.max degree (tree_degree next)
+| BinaryNode(Leaf(Variable("X")), Times, _) :: next -> Float.max 1. (tree_degree next)
 | BinaryNode(Leaf(Variable("X")), Exp, Leaf(Const(degree))) :: next -> Float.max degree (tree_degree next)
 | _ :: next -> tree_degree next
 
