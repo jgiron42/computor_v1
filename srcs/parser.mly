@@ -7,7 +7,7 @@
 %token EOL
 %left PLUS MINUS        /* lowest precedence */
 %left TIMES DIV         /* medium precedence */
-%left EXP         /* medium precedence */
+%right EXP         /* medium precedence */
 %nonassoc UMINUS        /* highest precedence */
 %token EOF
 %start main             /* the entry point */
