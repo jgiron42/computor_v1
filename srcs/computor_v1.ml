@@ -4,6 +4,9 @@ open Lexer
 open Mathexpr
 open Tree
 
+external feclearexcept : int -> unit = "feclearexcept"
+external fetestexcept : int -> int = "fetestexcept"
+
 let from_equation s = match (String.split_on_char '=' s) with
   | a :: [b] -> ("("^a^")-("^b^")")
   | _ -> (Printf.fprintf stderr "No equal\n" ;exit 1)
@@ -50,15 +53,15 @@ let solve_poly2 = function
   | (0., b, c) -> solve_poly1 (b, c)
   | (a, b, c) -> ( let delta = (b *. b -. 4. *. a *. c) in match delta with
     | n when (Float.compare n  0.) > 0 -> print_string "Discriminant is strictly positive, ";
-    [(parse (sprintf "(-%f-(%f^0.5))/(2 * %f)" b delta a)); (parse(sprintf "(-%f+%f^0.5)/(2 * %f)" b delta a))]
+    [(parse (sprintf "(-%f-(%f^(1/2)))/(2 * %f)" b delta a)); (parse(sprintf "(-%f+%f^(1/2))/(2 * %f)" b delta a))]
     | n when (Float.compare n  0.) == 0 -> print_string "Discriminant is null, ";[(parse(sprintf "(-%f)/(2 * %f)" b a)) ]
     | n when (Float.compare n  0.) < 0 -> print_string "Discriminant is strictly negative, ";
-    [(parse (sprintf "(-%f-i*((-%f)^0.5))/(2 * %f)" b delta a)); (parse(sprintf "(-%f+i*(-%f)^0.5)/(2 * %f)" b delta a))]
+    [(parse (sprintf "(-%f-i*((-%f)^(1/2)))/(2 * %f)" b delta a)); (parse(sprintf "(-%f+i*(-%f)^(1/2))/(2 * %f)" b delta a))]
     | _ -> [])
 
 let rec pretty_print_poly = function
-| (a, b) :: [] -> printf "%f * X^%d = 0\n" a b;
-| (a, b) :: r -> printf "%f * X^%d + " a b ; pretty_print_poly r;
+| (a, b) :: [] -> printf "%g * X^%d = 0\n" a b;
+| (a, b) :: r -> printf "%g * X^%d + " a b ; pretty_print_poly r;
 | [] -> printf "0 = 0\n"
 
 let do_magic a = a
@@ -71,14 +74,34 @@ let do_magic a = a
   |> factorize
   |> group_exp
   |> simplify
-  |> reduce
+  |> map_until reduce_a
+  |> simplify
 
-let pretty_print_expr e = do_magic e
+let zbeub t = print_tree t; t
+
+let pretty_string_of_expr e = do_magic e
   |> put_unary
-  |> put_minus
   |> factorize_out
+  |> put_minus
   |> put_div
-  |> print_expr
+  |> map_until reduce_a
+  |> simplify
+  |> factorize_div
+  |> string_of_expr
+
+let pretty_print_expr e = print_string (pretty_string_of_expr e)
+
+let print_result e = feclearexcept 61;
+	let reduced = pretty_string_of_expr e and solved = (Printf.sprintf "%g" (eval_node e)) in
+		if (reduced = solved)
+			then (print_string reduced; print_newline ())
+			else (print_string reduced; print_string " ≈ "; print_string solved; print_newline ())
+
+
+let rec print_sum = function
+| n :: r -> print_tree n; print_sum r
+| [] -> print_newline ()
+
 
 let () = if ((Array.length Sys.argv) != 2) then (Printf.fprintf stderr "Invalid number of arguments\n" ;exit 1)
 		 else let tree = (Sys.argv.(1) |> from_equation |> parse |> do_magic) in
@@ -92,10 +115,10 @@ let () = if ((Array.length Sys.argv) != 2) then (Printf.fprintf stderr "Invalid 
 					|] in
 					let degree = poly_degree (Array.to_list poly2) in
 						(printf "Reduced form: "; pretty_print_poly (List.filter (function | (0. , _) -> false | _ -> true) [(poly2.(0), 0); (poly2.(1), 1); (poly2.(2), 2)]));
-						(print_string "Polynomial degree: "; print_float degree; print_newline ());
+						(print_string "Polynomial degree: "; print_int (Float.to_int degree); print_newline ());
 						match tree with Leaf(Const(0.)) -> printf "All real numbers are solutions\n" | _ ->
 							solve_poly2 (poly2.(2), poly2.(1), poly2.(0)) |> function
-							  | [a; b] -> print_endline "the two solutions are:"; pretty_print_expr a; print_newline ();pretty_print_expr b; print_newline ();
-							  | [a] -> print_endline "the solution is:";pretty_print_expr a; print_newline ();
+							  | [a; b] -> print_endline "the two solutions are:"; print_result a; print_result b
+							  | [a] -> print_endline "the solution is:"; print_result a
 							  | [] -> print_endline "their is no solution";
 							  | _ -> () (* Unreached *)
