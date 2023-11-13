@@ -64,11 +64,13 @@ let rec pretty_print_poly = function
 | (a, b) :: r -> printf "%g * X^%d + " a b ; pretty_print_poly r;
 | [] -> printf "0 = 0\n"
 
+let print_tree_pipe t = print_tree t; t
+
 let do_magic a = a
   |> remove_minus
   |> remove_div
   |> remove_unary
-  |> expand
+  |> map_until expand
   |> normalize
   |> simplify
   |> factorize
@@ -76,8 +78,8 @@ let do_magic a = a
   |> simplify
   |> map_until reduce_a
   |> simplify
+  |> print_tree_pipe
 
-let zbeub t = print_tree t; t
 
 let pretty_string_of_expr e = do_magic e
   |> put_unary
