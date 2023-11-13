@@ -78,7 +78,6 @@ let do_magic a = a
   |> simplify
   |> map_until reduce_a
   |> simplify
-  |> print_tree_pipe
 
 
 let pretty_string_of_expr e = do_magic e
@@ -93,11 +92,13 @@ let pretty_string_of_expr e = do_magic e
 
 let pretty_print_expr e = print_string (pretty_string_of_expr e)
 
-let print_result e = feclearexcept 61;
-	let reduced = pretty_string_of_expr e and solved = (Printf.sprintf "%g" (eval_node e)) in
-		if (reduced = solved)
-			then (print_string reduced; print_newline ())
-			else (print_string reduced; print_string " ≈ "; print_string solved; print_newline ())
+let print_result e =
+        if (has_extra_variables  e)
+                then (pretty_print_expr ((map_until reduce_complex_d) e); print_newline ())
+                else let reduced = pretty_string_of_expr e and solved = (Printf.sprintf "%g" (eval_node e)) in
+        		if (reduced = solved)
+        			then (print_string reduced; print_newline ())
+        			else (print_string reduced; print_string " ≈ "; print_string solved; print_newline ())
 
 
 let rec print_sum = function

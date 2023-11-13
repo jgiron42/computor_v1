@@ -197,10 +197,10 @@ let factorize_div : (float node -> float node) = tree_map_d (function
 external feclearexcept : int -> unit = "feclearexcept"
 external fetestexcept : int -> int = "fetestexcept"
 
-let test_precision_lost f a b = feclearexcept 61; f a b; (Int.to_string (fetestexcept 61)) = "0"
+let test_precision_loss f a b = feclearexcept 61; f a b; (Int.to_string (fetestexcept 61)) = "0"
 let test_fraction f a b = (Float.equal (Float.of_int (Float.to_int (f a b))) (f a b))
 
-let rec reduce_one = function
+let rec reduce_one predicate = function
 | BinaryNode(BinaryNode(ll, Div, lr), Times, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(ll, Times, rl), Div, BinaryNode(lr, Times, rr))
 | BinaryNode(BinaryNode(ll, Div, lr), Times, r) -> BinaryNode(BinaryNode(ll, Times, r), Div, lr)
 | BinaryNode(l, Times, BinaryNode(rl, Div, rr)) -> BinaryNode(BinaryNode(l, Times, rl), Div, rr)
@@ -214,16 +214,16 @@ let rec reduce_one = function
 | BinaryNode(Leaf(Const(l)), Minus, Leaf(Const(r))) -> Leaf(Const(Float.sub l r))
 | BinaryNode(Leaf(Const(l)), Div, Leaf(Const(r)))
 (*  when (test_precision_lost Float.div l r) *)
-  when (test_fraction Float.div l r)
+  when (predicate Float.div l r)
   -> Leaf(Const(Float.div l r))
 | BinaryNode(BinaryNode(ll, Div, (Leaf(Const(_)) as lr)), Div, (Leaf(Const(_)) as r)) -> (BinaryNode(ll, Div, BinaryNode(lr, Times, r)))
 | BinaryNode(Leaf(Const(l)), Exp, Leaf(Const(r)))
 (*  when (test_precision_lost Float.pow l r) *)
-  when (test_fraction Float.pow l r)
+  when (predicate Float.pow l r)
   -> Leaf(Const(Float.pow l r))
 | BinaryNode(Leaf(Const(l)), Exp, BinaryNode(Leaf(Const(rl)), Div, Leaf(Const(rr))))
 (*  when (test_precision_lost Float.pow l r) *)
-  when (test_fraction Float.pow l (rl /. rr))
+  when (predicate Float.pow l (rl /. rr))
   -> Leaf(Const(Float.pow l (rl /. rr)))
 
 | UnaryNode(Opp, Leaf(Const(v))) -> Leaf(Const(Float.neg v))
@@ -236,9 +236,15 @@ let rec reduce_one = function
 | UnaryNode(Opp, BinaryNode(l, Minus, r)) -> BinaryNode(r, Minus, l)
 | other -> other
 
-let rec reduce_d = tree_map_d reduce_one
+let reduce_complex predicate = function
+        | BinaryNode(Leaf(Const(-1.)), Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.)))) -> Leaf(Variable("i"))
+        | other -> reduce_one predicate other
 
-let rec reduce_a = tree_map_a reduce_one
+let rec reduce_complex_d = tree_map_d (reduce_complex test_fraction)
+
+let rec reduce_d = tree_map_d (reduce_one test_fraction)
+
+let rec reduce_a = tree_map_a (reduce_one test_fraction)
 
 let rec simplify = tree_map_d (function
 | BinaryNode(_, Exp, Leaf(Const(0.))) -> Leaf(Const(1.))
