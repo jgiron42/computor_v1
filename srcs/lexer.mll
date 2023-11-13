@@ -8,7 +8,7 @@ rule token = parse
 	[' ' '\t']     { token lexbuf }
   | eof			   { EOF }
   | ['0'-'9']+("."['0'-'9']+)? as lxm { VAL(Const(float_of_string lxm)) }
-  | ['A'-'Z']+ as lxm { VAL(Variable(lxm)) }
+  | ['A'-'Z' 'a' - 'z']+ as lxm { VAL(Variable(lxm)) }
   | '+'            { PLUS }
   | '-'            { MINUS }
   | '*'            { TIMES }
