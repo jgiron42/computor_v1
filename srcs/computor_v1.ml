@@ -41,28 +41,27 @@ let rec has_extra_variables = function
 
 let rec poly_degree ?(n=0.) = function
 | [] -> 0.
-| 0. :: r -> poly_degree ~n:(n +. 1.) r
+| Leaf(Const(0.)) :: r -> poly_degree ~n:(n +. 1.) r
 | _ :: r -> Float.max n (poly_degree ~n:(n +. 1.) r)
 
 
 let solve_poly1 (a, b) = 
-  if (compare a 0.) = 0 then []
-  else [parse (sprintf "(-%f)/%f" b a)]
+  if (a = Leaf(Const(0.))) then []
+  else [BinaryNode(UnaryNode(Opp, b), Div, a)]
 
 let solve_poly2 = function
-  | (0., b, c) -> solve_poly1 (b, c)
-  | (a, b, c) -> ( let delta = (b *. b -. 4. *. a *. c) in match delta with
+  | (Leaf(Const(0.)), b, c) -> solve_poly1 (b, c)
+  (*| (a, b, c) -> ( let delta = (b *. b -. 4. *. a *. c) in match delta with*)
+  | (a, b, c) -> ( let delta = (BinaryNode(BinaryNode(b, Times, b), Minus, BinaryNode(Leaf(Const(4.)), Times, BinaryNode(a, Times, c)))) in match (eval_node delta) with
     | n when (Float.compare n  0.) > 0 -> print_string "Discriminant is strictly positive, ";
-    [(parse (sprintf "(-%f-(%f^(1/2)))/(2 * %f)" b delta a)); (parse(sprintf "(-%f+%f^(1/2))/(2 * %f)" b delta a))]
-    | n when (Float.compare n  0.) == 0 -> print_string "Discriminant is null, ";[(parse(sprintf "(-%f)/(2 * %f)" b a)) ]
+    [BinaryNode(BinaryNode(UnaryNode(Opp, b), Minus, BinaryNode(delta, Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.))))), Div, BinaryNode(Leaf(Const(2.)), Times, a)); 
+     BinaryNode(BinaryNode(UnaryNode(Opp, b), Plus, BinaryNode(delta, Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.))))), Div, BinaryNode(Leaf(Const(2.)), Times, a))]
+    | n when (Float.compare n  0.) == 0 -> print_string "Discriminant is null, ";
+    [BinaryNode(UnaryNode(Opp, b), Div, BinaryNode(Leaf(Const(2.)), Times, a))] 
     | n when (Float.compare n  0.) < 0 -> print_string "Discriminant is strictly negative, ";
-    [(parse (sprintf "(-%f-i*((-%f)^(1/2)))/(2 * %f)" b delta a)); (parse(sprintf "(-%f+i*(-%f)^(1/2))/(2 * %f)" b delta a))]
+    [BinaryNode(BinaryNode(UnaryNode(Opp, b), Minus, BinaryNode(Leaf(Variable("i")), Times, BinaryNode(UnaryNode(Opp, delta), Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.)))))), Div, BinaryNode(Leaf(Const(2.)), Times, a)); 
+    BinaryNode(BinaryNode(UnaryNode(Opp, b), Plus, BinaryNode(Leaf(Variable("i")), Times, BinaryNode(UnaryNode(Opp, delta), Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.)))))), Div, BinaryNode(Leaf(Const(2.)), Times, a))]
     | _ -> [])
-
-let rec pretty_print_poly = function
-| (a, b) :: [] -> printf "%g * X^%d = 0\n" a b;
-| (a, b) :: r -> printf "%g * X^%d + " a b ; pretty_print_poly r;
-| [] -> printf "0 = 0\n"
 
 let print_tree_pipe t = print_tree t; t
 
@@ -100,6 +99,12 @@ let print_result e =
         			then (print_string reduced; print_newline ())
         			else (print_string reduced; print_string " ≈ "; print_string solved; print_newline ())
 
+let rec pretty_print_poly = function
+| (a, b) :: [] -> printf "%s * X^%d = 0\n" (pretty_string_of_expr a) b;
+| (a, b) :: r -> printf "%s * X^%d + " (pretty_string_of_expr a) b ; pretty_print_poly r;
+| [] -> printf "0 = 0\n"
+
+
 
 let rec print_sum = function
 | n :: r -> print_tree n; print_sum r
@@ -112,12 +117,12 @@ let () = if ((Array.length Sys.argv) != 2) then (Printf.fprintf stderr "Invalid 
 				if (has_extra_variables tree) then (Printf.fprintf stderr "The expression have other variables than X.\n" ;exit 1)
 				else if (tree_degree sum) > 2. then (Printf.fprintf stderr "The polynomial degree is strictly greater than 2, I can't solve.\n" ;exit 1)
 				else let poly2 = [|
-					factors_of (Leaf(Const(1.))) sum |> eval_node;
-					factors_of (Leaf(Variable("X"))) sum |> eval_node;
-					factors_of (BinaryNode(Leaf(Variable("X")), Exp, Leaf(Const(2.)))) sum |> eval_node
+					factors_of (Leaf(Const(1.))) sum |> (map_until reduce_a);
+					factors_of (Leaf(Variable("X"))) sum |> (map_until reduce_a);
+					factors_of (BinaryNode(Leaf(Variable("X")), Exp, Leaf(Const(2.)))) sum |> (map_until reduce_a)
 					|] in
 					let degree = poly_degree (Array.to_list poly2) in
-						(printf "Reduced form: "; pretty_print_poly (List.filter (function | (0. , _) -> false | _ -> true) [(poly2.(0), 0); (poly2.(1), 1); (poly2.(2), 2)]));
+						(printf "Reduced form: "; pretty_print_poly (List.filter (function | (Leaf(Const(0.)) , _) -> false | _ -> true) [(poly2.(0), 0); (poly2.(1), 1); (poly2.(2), 2)]));
 						(print_string "Polynomial degree: "; print_int (Float.to_int degree); print_newline ());
 						match tree with Leaf(Const(0.)) -> printf "All real numbers are solutions\n" | _ ->
 							solve_poly2 (poly2.(2), poly2.(1), poly2.(0)) |> function
