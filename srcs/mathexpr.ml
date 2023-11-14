@@ -99,7 +99,9 @@ let rec eval_node_environ environ = function
 | UnaryNode(Invert, l) -> Float.div 1. (eval_node_environ environ l)
 | _ -> Float.nan (* Unreached *)
 
-let eval_node = eval_node_environ (Hashtbl.create 10)
+let remove_minus_0 x = if x = -0. then 0. else x
+
+let eval_node e = remove_minus_0 (eval_node_environ (Hashtbl.create 10) e)
 
 and remove_unary = tree_map_a (function
 | UnaryNode(Opp, n) -> BinaryNode(n, Times, Leaf(Const(-1.)))
@@ -209,22 +211,22 @@ let rec reduce_one predicate = function
 
 | BinaryNode(Leaf(Const(l)), Plus, Leaf(Const(r))) -> Leaf(Const(Float.add l r))
 | BinaryNode(Leaf(Const(l)), Times, Leaf(Const(r))) -> Leaf(Const(Float.mul l r))
-| BinaryNode(BinaryNode(_ as ll, Plus, Leaf(Const(lr))), Plus, Leaf(Const(r))) -> BinaryNode(ll, Plus, Leaf(Const(Float.add lr r)))
-| BinaryNode(BinaryNode(_ as ll, Times, Leaf(Const(lr))), Times, Leaf(Const(r))) -> BinaryNode(ll, Times, Leaf(Const(Float.mul lr r)))
-| BinaryNode(Leaf(Const(l)), Minus, Leaf(Const(r))) -> Leaf(Const(Float.sub l r))
+| BinaryNode(BinaryNode(_ as ll, Plus, Leaf(Const(lr))), Plus, Leaf(Const(r))) -> BinaryNode(ll, Plus, Leaf(Const(remove_minus_0 (Float.add lr r))))
+| BinaryNode(BinaryNode(_ as ll, Times, Leaf(Const(lr))), Times, Leaf(Const(r))) -> BinaryNode(ll, Times, Leaf(Const(remove_minus_0 (Float.mul lr r))))
+| BinaryNode(Leaf(Const(l)), Minus, Leaf(Const(r))) -> Leaf(Const(remove_minus_0 (Float.sub l r)))
 | BinaryNode(Leaf(Const(l)), Div, Leaf(Const(r)))
 (*  when (test_precision_lost Float.div l r) *)
   when (predicate Float.div l r)
-  -> Leaf(Const(Float.div l r))
+  -> Leaf(Const(remove_minus_0 (Float.div l r)))
 | BinaryNode(BinaryNode(ll, Div, (Leaf(Const(_)) as lr)), Div, (Leaf(Const(_)) as r)) -> (BinaryNode(ll, Div, BinaryNode(lr, Times, r)))
 | BinaryNode(Leaf(Const(l)), Exp, Leaf(Const(r)))
 (*  when (test_precision_lost Float.pow l r) *)
   when (predicate Float.pow l r)
-  -> Leaf(Const(Float.pow l r))
+  -> Leaf(Const(remove_minus_0 (Float.pow l r)))
 | BinaryNode(Leaf(Const(l)), Exp, BinaryNode(Leaf(Const(rl)), Div, Leaf(Const(rr))))
 (*  when (test_precision_lost Float.pow l r) *)
   when (predicate Float.pow l (rl /. rr))
-  -> Leaf(Const(Float.pow l (rl /. rr)))
+  -> Leaf(Const(remove_minus_0 (Float.pow l (rl /. rr))))
 
 | UnaryNode(Opp, Leaf(Const(v))) -> Leaf(Const(Float.neg v))
 | BinaryNode(l, Minus, Leaf(Const(r))) when ((Float.compare r 0.) < 0) -> BinaryNode(l, Plus, Leaf(Const(Float.neg r)))

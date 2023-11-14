@@ -79,7 +79,7 @@ let do_magic a = a
   |> simplify
 
 
-let pretty_string_of_expr e = do_magic e
+let beautify e = do_magic e
   |> put_unary
   |> factorize_out
   |> put_minus
@@ -87,6 +87,8 @@ let pretty_string_of_expr e = do_magic e
   |> map_until reduce_a
   |> simplify
   |> factorize_div
+
+let pretty_string_of_expr e = beautify e
   |> string_of_expr
 
 let pretty_print_expr e = print_string (pretty_string_of_expr e)
@@ -97,7 +99,14 @@ let print_result e =
                 else let reduced = pretty_string_of_expr e and solved = (Printf.sprintf "%g" (eval_node e)) in
         		if (reduced = solved)
         			then (print_string reduced; print_newline ())
-        			else (print_string reduced; print_string " ≈ "; print_string solved; print_newline ())
+        			else let dec = pretty_string_of_expr ((map_until (tree_map_a (reduce_one test_precision_loss))) (beautify e)) in
+                                if (dec = solved)
+                                then (print_string reduced; print_string "   =   "; print_string solved; print_newline ())
+                                else if (reduced = dec)
+                                    then (print_string reduced; print_string "   ≈   "; print_string solved; print_newline ())
+                                    else (print_string reduced; print_string "   =   "; print_string dec; print_string "   ≈   "; print_string solved; print_newline ())
+
+
 
 let rec pretty_print_poly = function
 | (a, b) :: [] -> printf "%s * X^%d = 0\n" (pretty_string_of_expr a) b;
