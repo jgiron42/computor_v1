@@ -21,6 +21,7 @@ let rec factors_of f = function
 | any :: next when any = f -> BinaryNode(Leaf(Const(1.)), Plus, (factors_of f next))
 | (BinaryNode(l, Times, r)) :: next when (l = f && not (has_variable r)) -> BinaryNode(r, Plus, (factors_of f next))
 | (BinaryNode(l, Times, r)) :: next when (r = f && not (has_variable l)) -> BinaryNode(l, Plus, (factors_of f next))
+| (BinaryNode(l, Times, Leaf(Const(r)))) :: next -> BinaryNode(BinaryNode(factors_of f [l], Times, Leaf(Const(r))), Plus, (factors_of f next))
 | _ :: next -> factors_of f next
 
 let rec tree_degree = function
@@ -84,9 +85,10 @@ let beautify e = do_magic e
   |> factorize_out
   |> put_minus
   |> put_div
+  |> factorize_div
+  |> print_tree_pipe
   |> map_until reduce_a
   |> simplify
-  |> factorize_div
 
 let pretty_string_of_expr e = beautify e
   |> string_of_expr
@@ -94,17 +96,16 @@ let pretty_string_of_expr e = beautify e
 let pretty_print_expr e = print_string (pretty_string_of_expr e)
 
 let print_result e =
-        if (has_extra_variables  e)
-                then (pretty_print_expr ((map_until reduce_complex_d) e); print_newline ())
-                else let reduced = pretty_string_of_expr e and solved = (Printf.sprintf "%g" (eval_node e)) in
-        		if (reduced = solved)
-        			then (print_string reduced; print_newline ())
-        			else let dec = pretty_string_of_expr ((map_until (tree_map_a (reduce_one test_precision_loss))) (beautify e)) in
-                                if (dec = solved)
-                                then (print_string reduced; print_string "   =   "; print_string solved; print_newline ())
-                                else if (reduced = dec)
-                                    then (print_string reduced; print_string "   ≈   "; print_string solved; print_newline ())
-                                    else (print_string reduced; print_string "   =   "; print_string dec; print_string "   ≈   "; print_string solved; print_newline ())
+        let reduced = pretty_string_of_expr ((map_until (tree_map_a (reduce_complex test_fraction))) (beautify e))
+        and dec = pretty_string_of_expr ((map_until (tree_map_a (reduce_complex test_precision_loss))) (print_tree_pipe (beautify e))) in
+        		print_string reduced; (if (reduced != dec)
+        			then (printf "   =   %s" dec)
+        			else if (not (has_extra_variables e))
+        				then (let solved = (Printf.sprintf "%g" (eval_node e)) in
+                             if (dec != solved)
+                                 then (printf "   ≈   %s" dec)
+                        )
+                    ) ; print_newline ()
 
 
 

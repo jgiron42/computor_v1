@@ -238,10 +238,12 @@ let rec reduce_one predicate = function
 | UnaryNode(Opp, BinaryNode(l, Minus, r)) -> BinaryNode(r, Minus, l)
 | other -> other
 
-let reduce_complex predicate = function
+let reduce_complex predicate t = print_tree t; t |> function
         | BinaryNode(Leaf(Const(-1.)), Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.)))) -> Leaf(Variable("i"))
         | BinaryNode(Leaf(Const(c)), Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.)))) when (Float.compare c 0.) < 0 -> BinaryNode(BinaryNode(Leaf(Const(-.c)), Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.)))), Times, Leaf(Variable("i")))
         | BinaryNode(UnaryNode(Opp, n), Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.)))) -> BinaryNode(Leaf(Variable("i")), Times, BinaryNode(n, Exp, BinaryNode(Leaf(Const(1.)), Div, Leaf(Const(2.)))))
+        | BinaryNode(Leaf(Variable("i")), Times, Leaf(Variable("i"))) -> Leaf(Const(-1.))
+        | BinaryNode(BinaryNode(ll, Times, Leaf(Variable("i"))), Times, Leaf(Variable("i"))) -> UnaryNode(Opp, ll)
         | other -> reduce_one predicate other
 
 let rec reduce_complex_d = tree_map_d (reduce_complex test_fraction)
